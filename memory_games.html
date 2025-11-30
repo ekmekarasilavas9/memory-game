@@ -128,7 +128,7 @@
 
     <!-- Control Buttons -->
     <div class="mt-8 flex flex-col space-y-3">
-        <button id="next-btn" onclick="nextQuestion()" class="btn-primary w-full hidden">Next Question (New Sequence)</button>
+        <button id="next-btn" onclick="nextQuestion()" class="btn-primary w-full hidden">Next Question</button>
     </div>
 </div>
 
@@ -188,7 +188,6 @@
 
             const utterance = new SpeechSynthesisUtterance(text);
             
-            // Set the speech rate to 0.7 (slower than default 1.0)
             utterance.rate = 0.85; 
             
             // Try to set English language
@@ -489,4 +488,5 @@
 
 </body>
 </html>
+
 
