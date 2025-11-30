@@ -156,12 +156,14 @@
     const newGameTopBtn = document.getElementById('new-game-top-btn');
 
 
-    // Question Templates (English) - Artık sadece TTS için kullanılıyor, UI için değil.
+    // Question Templates (English) - Soru tiplerinin TTS metinleri (Count olarak güncellendi)
     const questionTemplates = {
         lowest: "Enter the lowest number of the following sequence?",
         highest: "Enter the highest number of the following sequence?",
         secondLowest: "Enter the second lowest number of the following sequence?",
-        secondHighest: "Enter the second highest number of the following sequence?"
+        secondHighest: "Enter the second highest number of the following sequence?",
+        sumEvens: "How many even numbers do you hear?", // "Sum" yerine "How many" olarak güncellendi
+        sumOdds: "How many odd numbers do you hear?" // "Sum" yerine "How many" olarak güncellendi
     };
     
     // UI için sabit soru metni
@@ -186,8 +188,8 @@
 
             const utterance = new SpeechSynthesisUtterance(text);
             
-            // Set the speech rate to 0.8 (slower than default 1.0)
-            utterance.rate = 0.8; 
+            // Set the speech rate to 0.7 (slower than default 1.0)
+            utterance.rate = 0.80; 
             
             // Try to set English language
             const voices = synth.getVoices();
@@ -250,6 +252,7 @@
     async function speakSequenceAndQuestion() {
         // Randomly select one question (for TTS)
         const allQuestions = Object.keys(questionTemplates);
+        // Yeni soru tipleri dahil olmak üzere tüm soru tipleri arasından rastgele seçim yapılır
         const randomIndex = Math.floor(Math.random() * allQuestions.length);
         currentQuestionType = allQuestions[randomIndex];
         
@@ -257,7 +260,6 @@
         
         // TTS text: "Question text. The number sequence is: number, number, number."
         const sequenceString = sequence.join(', ');
-        const ttsText = `${questionText} ${sequenceString}.`;
         
         // UI Update (Listening Phase)
         newGameTopBtn.textContent = '...Listening...'; // Update the top button's text during speech
@@ -267,9 +269,18 @@
         numberDisplayEl.classList.remove('opacity-0');
         
         try {
-            await speakText(ttsText);
+            // 1. Speak the Question
+            await speakText(questionText);
+            
+            // 2. Introduce 1-second delay (the requested pause)
+            await new Promise(resolve => setTimeout(resolve, 250));
+
+            // 3. Speak the Sequence
+            await speakText(sequenceString); 
+            
         } catch (error) {
             console.error("Speech generation or playback failed:", error.message);
+            // Fallback: If speech fails, show the sequence visually for the user.
             messageEl.textContent = "Speech failed. The sequence was: " + sequenceString;
             await new Promise(resolve => setTimeout(resolve, 3000));
         }
@@ -342,7 +353,7 @@
      */
     function nextQuestion() {
         startGame(false); // Start new round, keep score.
-        nextBtn.textContent = 'Next Question (New Sequence)'; 
+        nextBtn.textContent = 'Next Question'; 
     }
 
     /**
@@ -353,6 +364,12 @@
 
         const userAnswer = parseInt(answerInputEl.value.trim());
         let correctAnswer = null;
+
+        // Çift ve tek sayıların sayısını hesapla (kullanıcının isteği üzerine)
+        const countEvens = sequence.filter(num => num % 2 === 0).length;
+        
+        const countOdds = sequence.filter(num => num % 2 !== 0).length;
+
 
         // Determine the correct answer
         switch (currentQuestionType) {
@@ -367,6 +384,12 @@
                 break;
             case 'secondHighest':
                 correctAnswer = sortedSequence[sortedSequence.length - 2];
+                break;
+            case 'sumEvens': // Çift sayıların sayısı (how many)
+                correctAnswer = countEvens;
+                break;
+            case 'sumOdds': // Tek sayıların sayısı (how many)
+                correctAnswer = countOdds;
                 break;
         }
 
@@ -397,7 +420,7 @@
 
 
         // --- Next Button Geri Sayım Mantığı ---
-        let countdown = 2;
+        let countdown = 1;
         
         // Next button always shows the countdown now
         nextBtn.textContent = `Next in ${countdown}s...`;
@@ -411,7 +434,7 @@
                  nextBtn.textContent = `Next in ${countdown}s...`;
             } else {
                 clearInterval(timer);
-                nextBtn.textContent = 'Next Question (New Sequence)'; 
+                nextBtn.textContent = 'Next Question'; 
                 nextBtn.disabled = false;
             }
         }, 1000);
