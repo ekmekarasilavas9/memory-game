@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory and Sequencing Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .game-container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            max-width: 550px;
+            width: 100%;
+            text-align: center;
+        }
+        .question-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 20px;
+            min-height: 40px; 
+        }
+        .feedback {
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); 
+        }
+        .correct {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .wrong {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .number-display {
+            font-size: 1.5rem; 
+            letter-spacing: 2px;
+            padding: 20px;
+            margin-bottom: 30px;
+            min-height: 80px;
+            background-color: #e0f2fe;
+            border-radius: 12px;
+            color: #0369a1;
+            font-weight: 700;
+            transition: opacity 0.5s ease-out;
+            user-select: none;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #2563eb;
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    
+    <!-- Başlık ve Yeni Oyun Butonu için Esnek Kapsayıcı -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">Memory and Sequencing Game</h1>
+        <!-- New Game Button artık başlığın yanında -->
+        <button id="new-game-top-btn" onclick="startGame()" 
+                class="text-xs font-semibold bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-full shadow-md transition duration-150">
+            New Game
+        </button>
+    </div>
+    
+    <!-- Scoreboard (Basitleştirilmiş) -->
+    <div class="flex justify-between text-lg font-medium mb-4 p-3 bg-gray-100 rounded-lg">
+        <p class="text-green-600">Correct: <span id="correct-score">0</span></p>
+        <p class="text-red-600">Wrong: <span id="wrong-score">0</span></p>
+    </div>
+
+    <!-- Listening Area -->
+    <div id="number-display" class="number-display opacity-0">
+        <!-- Listening indicator will appear here -->
+    </div>
+
+    <!-- Game Area -->
+    <div id="game-area">
+        <!-- Başlangıç ve Soru Mesajı alanı güncellendi -->
+        <p id="message" class="question-text">Press the "New Game" button to begin. </p>
+
+        <!-- Answer Form -->
+        <div id="answer-form" class="hidden">
+            <input type="number" id="answer-input" placeholder="Enter Number Here" 
+                   class="w-full p-3 mb-4 text-center border-2 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+            <button id="submit-btn" onclick="checkAnswer()" class="btn-primary w-full disabled:opacity-50">Answer</button>
+        </div>
+        
+        <!-- Feedback Area -->
+        <div id="feedback-message" class="feedback opacity-0"></div>
+
+    </div>
+
+    <!-- Correct Answer Display -->
+    <div id="correct-number-display" class="hidden p-3 mt-4 font-semibold text-center rounded-lg bg-yellow-100 text-yellow-800 border border-yellow-300 shadow-md transition duration-300">
+        <!-- Correct number will be shown here -->
+    </div>
+
+
+    <!-- Control Buttons -->
+    <div class="mt-8 flex flex-col space-y-3">
+        <button id="next-btn" onclick="nextQuestion()" class="btn-primary w-full hidden">Next Question (New Sequence)</button>
+    </div>
+</div>
+
+<script type="text/javascript">
+    // --- Global Variables and Element Setup ---
+    let correctScore = 0;
+    let wrongScore = 0;
+    let sequence = []; 
+    let sortedSequence = []; 
+    let currentQuestionType = ''; 
+    let isGameActive = false;
+    let isAwaitingAnswer = false;
+    let synth = window.speechSynthesis; // Web Speech API object
+
+    const correctScoreEl = document.getElementById('correct-score');
+    const wrongScoreEl = document.getElementById('wrong-score');
+    const messageEl = document.getElementById('message');
+    const numberDisplayEl = document.getElementById('number-display');
+    const answerInputEl = document.getElementById('answer-input');
+    const answerFormEl = document.getElementById('answer-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const feedbackEl = document.getElementById('feedback-message');
+    const correctNumberDisplayEl = document.getElementById('correct-number-display');
+    const newGameTopBtn = document.getElementById('new-game-top-btn');
+
+
+    // Question Templates (English) - Artık sadece TTS için kullanılıyor, UI için değil.
+    const questionTemplates = {
+        lowest: "Enter the lowest number of the following sequence?",
+        highest: "Enter the highest number of the following sequence?",
+        secondLowest: "Enter the second lowest number of the following sequence?",
+        secondHighest: "Enter the second highest number of the following sequence?"
+    };
+    
+    // UI için sabit soru metni
+    const uiQuestionText = "Enter the correct number.";
+
+
+    // --- Web Speech API TTS Helper Function (FAST & PRACTICAL) ---
+
+    /**
+     * Speaks the given text using the browser's native TTS engine.
+     */
+    function speakText(text) {
+        return new Promise((resolve) => {
+            if (!synth) {
+                console.error("Browser does not support Web Speech API.");
+                resolve(); 
+                return;
+            }
+            if (synth.speaking) {
+                synth.cancel(); // Stop current speech if any
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Set the speech rate to 0.8 (slower than default 1.0)
+            utterance.rate = 0.8; 
+            
+            // Try to set English language
+            const voices = synth.getVoices();
+            const englishVoice = voices.find(voice => voice.lang === 'en-US' || voice.lang.startsWith('en'));
+            
+            if (englishVoice) {
+                utterance.voice = englishVoice;
+            } else {
+                utterance.lang = 'en-US'; 
+            }
+
+            utterance.onend = () => {
+                resolve();
+            };
+            utterance.onerror = (event) => {
+                console.error('SpeechSynthesisError:', event.error);
+                resolve(); // Resolve even on error to continue game flow
+            };
+
+            synth.speak(utterance);
+        });
+    }
+
+    // --- Game Logic Functions ---
+    
+    /**
+     * Updates the score display.
+     */
+    function updateScoreDisplay() {
+        correctScoreEl.textContent = correctScore;
+        wrongScoreEl.textContent = wrongScore;
+    }
+
+    /**
+     * Generates 6 unique random numbers between 1 and 100.
+     */
+    function generateSequence() {
+        const numbers = new Set();
+        while (numbers.size < 6) {
+            const num = Math.floor(Math.random() * 100) + 1;
+            numbers.add(num);
+        }
+        const newSequence = Array.from(numbers);
+        
+        // Shuffle the array
+        for (let i = newSequence.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newSequence[i], newSequence[j]] = [newSequence[j], newSequence[i]];
+        }
+        
+        // Create sorted copy for checking
+        sortedSequence = [...newSequence].sort((a, b) => a - b);
+        
+        return newSequence;
+    }
+
+    /**
+     * Speaks the sequence and the question, then starts the question phase.
+     */
+    async function speakSequenceAndQuestion() {
+        // Randomly select one question (for TTS)
+        const allQuestions = Object.keys(questionTemplates);
+        const randomIndex = Math.floor(Math.random() * allQuestions.length);
+        currentQuestionType = allQuestions[randomIndex];
+        
+        const questionText = questionTemplates[currentQuestionType].replace('?', ''); 
+        
+        // TTS text: "Question text. The number sequence is: number, number, number."
+        const sequenceString = sequence.join(', ');
+        const ttsText = `${questionText} ${sequenceString}.`;
+        
+        // UI Update (Listening Phase)
+        newGameTopBtn.textContent = '...Listening...'; // Update the top button's text during speech
+        newGameTopBtn.disabled = true;
+        messageEl.textContent = "Please listen carefully to the question and the number sequence.";
+        numberDisplayEl.textContent = '🔊 Listening...';
+        numberDisplayEl.classList.remove('opacity-0');
+        
+        try {
+            await speakText(ttsText);
+        } catch (error) {
+            console.error("Speech generation or playback failed:", error.message);
+            messageEl.textContent = "Speech failed. The sequence was: " + sequenceString;
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+        
+        // Speech ended, start the question phase
+        startQuestionPhase();
+    }
+    
+    /**
+     * Starts the game: generates new numbers and triggers speech.
+     */
+    function startGame(resetScore = true) {
+        if (resetScore) {
+            correctScore = 0;
+            wrongScore = 0;
+            updateScoreDisplay(); 
+        }
+
+        // Prepare elements
+        nextBtn.classList.add('hidden');
+        newGameTopBtn.textContent = 'New Game'; // Reset top button text
+        newGameTopBtn.disabled = true; // Disable until question phase starts
+        answerFormEl.classList.add('hidden');
+        answerInputEl.value = '';
+        hideFeedback();
+        isGameActive = false;
+        // Doğru cevap göstergesini gizle
+        correctNumberDisplayEl.classList.add('hidden'); 
+
+        // 1. Generate Sequence
+        sequence = generateSequence();
+        
+        // 2. Start speech
+        speakSequenceAndQuestion();
+    }
+
+    /**
+     * Starts the question phase and displays the selected random question.
+     */
+    function startQuestionPhase() {
+        // Clear number display
+        numberDisplayEl.classList.add('opacity-0');
+        numberDisplayEl.textContent = '';
+        
+        isGameActive = true;
+        newGameTopBtn.textContent = 'New Game'; // Ensure button is ready
+        newGameTopBtn.disabled = false; // Enable the top button now
+        
+        // Show the question
+        askQuestion();
+    }
+
+    /**
+     * Displays the current random question.
+     */
+    function askQuestion() {
+        // Soru metnini sabit UI metni ile değiştir.
+        messageEl.textContent = uiQuestionText; 
+        
+        answerFormEl.classList.remove('hidden');
+        answerInputEl.value = '';
+        answerInputEl.focus();
+        nextBtn.classList.add('hidden'); 
+        submitBtn.disabled = false;
+        isAwaitingAnswer = true;
+    }
+
+    /**
+     * Moves to the next question or starts a new game round.
+     */
+    function nextQuestion() {
+        startGame(false); // Start new round, keep score.
+        nextBtn.textContent = 'Next Question (New Sequence)'; 
+    }
+
+    /**
+     * Checks the user's answer and updates scores.
+     */
+    function checkAnswer() {
+        if (!isGameActive || !isAwaitingAnswer) return;
+
+        const userAnswer = parseInt(answerInputEl.value.trim());
+        let correctAnswer = null;
+
+        // Determine the correct answer
+        switch (currentQuestionType) {
+            case 'lowest':
+                correctAnswer = sortedSequence[0];
+                break;
+            case 'highest':
+                correctAnswer = sortedSequence[sortedSequence.length - 1];
+                break;
+            case 'secondLowest':
+                correctAnswer = sortedSequence[1];
+                break;
+            case 'secondHighest':
+                correctAnswer = sortedSequence[sortedSequence.length - 2];
+                break;
+        }
+
+        const isCorrect = (userAnswer === correctAnswer);
+        
+        // Determine feedback content
+        let feedbackMessage;
+        if (isCorrect) {
+            correctScore++;
+            feedbackMessage = `Correct! The answer was: <strong>${correctAnswer}</strong>. The sequence was: ${sequence.join(', ')}`;
+        } else {
+            wrongScore++;
+            // The correct answer is now wrapped in <strong> tags for visual emphasis
+            feedbackMessage = `Wrong! The correct number was: <strong>${correctAnswer}</strong>. The sequence was: ${sequence.join(', ')}`;
+        }
+
+        updateScoreDisplay(); 
+        // Show feedback
+        showFeedback(isCorrect, feedbackMessage);
+        
+        // Disable form after checking
+        submitBtn.disabled = true;
+        isAwaitingAnswer = false;
+
+        // --- Doğru Sayıyı Göster ---
+        correctNumberDisplayEl.textContent = `Correct Number: ${correctAnswer}`;
+        correctNumberDisplayEl.classList.remove('hidden');
+
+
+        // --- Next Button Geri Sayım Mantığı ---
+        let countdown = 2;
+        
+        // Next button always shows the countdown now
+        nextBtn.textContent = `Next in ${countdown}s...`;
+        
+        nextBtn.disabled = true;
+        nextBtn.classList.remove('hidden');
+
+        const timer = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+                 nextBtn.textContent = `Next in ${countdown}s...`;
+            } else {
+                clearInterval(timer);
+                nextBtn.textContent = 'Next Question (New Sequence)'; 
+                nextBtn.disabled = false;
+            }
+        }, 1000);
+    }
+
+    /**
+     * Displays the feedback message. Uses innerHTML to support text highlighting.
+     */
+    function showFeedback(isCorrect, text) {
+        // 1. Set content using innerHTML to allow <strong> tag for bolding
+        feedbackEl.innerHTML = text;
+        feedbackEl.classList.remove('correct', 'wrong');
+        
+        // 2. Apply correct/wrong styling
+        feedbackEl.classList.add(isCorrect ? 'correct' : 'wrong');
+        
+        // 3. Make visible
+        setTimeout(() => {
+            feedbackEl.classList.remove('opacity-0');
+        }, 10);
+    }
+    
+    /**
+     * Hides the feedback message.
+     */
+    function hideFeedback() {
+        feedbackEl.classList.add('opacity-0');
+        feedbackEl.classList.remove('correct', 'wrong');
+    }
+
+    // Event listeners for quick actions
+    answerInputEl.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (isGameActive && isAwaitingAnswer) {
+                checkAnswer();
+            } else if (isGameActive && !isAwaitingAnswer && !nextBtn.disabled) {
+                nextQuestion();
+            }
+        }
+    });
+
+    // Initial load setup
+    window.onload = function() {
+        newGameTopBtn.focus(); // Focus the new game button on load
+        if (synth && synth.onvoiceschanged !== undefined) {
+             synth.onvoiceschanged = () => synth.getVoices();
+        }
+    };
+
+</script>
+
+</body>
+</html>
